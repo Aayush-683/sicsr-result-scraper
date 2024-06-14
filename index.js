@@ -22,10 +22,13 @@ async function runScraper() {
         await page.goto(BASE);
 
         // Fill the login form and submit
+        console.log('Logging in...');
         await page.fill(LOGIN_INPUT_ID, prn);
         await page.click(LOGIN_BTN_ID);
+        console.log('Logged in');
         await page.fill(SEAT_XPATH, seatNo);
         await page.click(VIEW_XPATH);
+        console.log('Viewing result...');
 
         // Wait for the result button and get the href attribute
         const resultHref = await retry(async () => {
@@ -33,16 +36,19 @@ async function runScraper() {
             return await element.getAttribute('href');
         });
         
+        console.log('Result found');
         // Construct the target URL for the result PDF
         const targetUrl = new URL(resultHref, BASE).href;
         let response = null;
         
+        console.log('Fetching PDF...');
         // Fetch the result PDF
         while (!response || response.status !== 200) {
             console.log('Attempting to fetch PDF...');
             response = await fetch(targetUrl);
         }
 
+        console.log('PDF fetched');
         // Write the PDF to the output file
         const buffer = await response.buffer();
         fs.writeFileSync(output, buffer);
