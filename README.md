@@ -6,11 +6,11 @@
 ## Installation
 1. Clone the repository
 2. Now you can run the project with the following command:
-   - Automatic installation and start:
-```bash
++ Automatic installation and start:
+```bash 
 npm run setup
 ```
-or for a manual installation:
++ or for a manual installation:
 ```bash
 npm install
 npx playwright install
