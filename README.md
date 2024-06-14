@@ -23,4 +23,4 @@ npm start
 ### Thats it! Now sit back and relax while the script does its magic.
 - The script will automatically open a browser window and start the process of scraping the data.
   
-⚠️ This project is highly in Beta and is not recommended for production use. Use at your own risk. ⚠️
+⚠️ This project is highly in Beta and is not recommended for extensive use. Use at your own risk. ⚠️
