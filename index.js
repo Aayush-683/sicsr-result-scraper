@@ -57,7 +57,7 @@ async function runScraper() {
     }
 }
 
-const retry = async (action, attempts = 5, delay = 1000) => {
+const retry = async (action, attempts = 25, delay = 1000) => {
     for (let i = 0; i < attempts; i++) {
         try {
             return await action();
@@ -77,5 +77,6 @@ const retry = async (action, attempts = 5, delay = 1000) => {
 }
 
 (async () => {
-    await retry(runScraper, 5, 10000);
+    let attempts = 50; // Number of attempts the scraper will make
+    await retry(runScraper, attempts, 10000); // function, attempts, delay
 })();
