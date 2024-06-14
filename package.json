@@ -1,0 +1,17 @@
+{
+  "name": "siu-result-scraper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npm i && npx playwright install && node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "fix-esm": "^1.0.1",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.44.1"
+  }
+}
