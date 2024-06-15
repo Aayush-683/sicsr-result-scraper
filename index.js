@@ -10,8 +10,8 @@ const LOGIN_INPUT_ID = '#login';
 const LOGIN_BTN_ID = '#lgnbtn';
 const RESULT_BTN_XPATH = 'xpath=//html/body/div[2]/form/div/div[2]/div[1]/a';
 
-const prn = '22030121307'; // Replace with your PRN value
-const seatNo = '433002'; // Replace with your seat number
+const prn = '22030121140'; // Replace with your PRN value
+const seatNo = '433035'; // Replace with your seat number
 const output = `${prn}.pdf`;
 
 async function runScraper() {
@@ -51,7 +51,7 @@ async function runScraper() {
         console.log('PDF fetched');
         // Write the PDF to the output file
         try {
-            console.log('Saving PDF...', response);
+            console.log('Saving PDF...');
             const writableStream = fs.createWriteStream(output);
             await streamPipeline(response.body, writableStream);
         } catch (error) {
