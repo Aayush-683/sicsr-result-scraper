@@ -1,7 +1,7 @@
 require('fix-esm').register();
 const { chromium } = require('playwright');
 const fs = require('fs');
-const fetch = require('node-fetch');
+const { fetch } = require('undici');
 
 const BASE = 'http://siuexam.siu.edu.in/forms/resultview.html';
 const SEAT_XPATH = 'xpath=//html/body/div[2]/form/div/div[1]/div[2]/div/div/div/div/div/input[1]';
@@ -50,8 +50,13 @@ async function runScraper() {
 
         console.log('PDF fetched');
         // Write the PDF to the output file
-        const buffer = await response.buffer();
-        fs.writeFileSync(output, buffer);
+        try {
+            console.log('Saving PDF...', response);
+            const writableStream = fs.createWriteStream(output);
+            await streamPipeline(response.body, writableStream);
+        } catch (error) {
+            throw error;
+        }
 
         console.log(`PDF saved as ${output}`);
     } catch (error) {
@@ -82,6 +87,12 @@ const retry = async (action, attempts = 25, delay = 1000) => {
     }
 }
 
+// Helper function to pipeline the response stream to the file system
+const { pipeline } = require('stream');
+const { promisify } = require('util');
+const streamPipeline = promisify(pipeline);
+
+// Main execution with retry logic
 (async () => {
     let attempts = 50; // Number of attempts the scraper will make
     await retry(runScraper, attempts, 10000); // function, attempts, delay

@@ -13,6 +13,7 @@
   "dependencies": {
     "fix-esm": "^1.0.1",
     "node-fetch": "^3.3.2",
-    "playwright": "^1.44.1"
+    "playwright": "^1.44.1",
+    "undici": "^6.19.0"
   }
 }
