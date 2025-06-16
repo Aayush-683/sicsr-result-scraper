@@ -2,98 +2,95 @@ require('fix-esm').register();
 const { chromium } = require('playwright');
 const fs = require('fs');
 const { fetch } = require('undici');
+const { pipeline } = require('stream');
+const { promisify } = require('util');
 
-const BASE = 'http://siuexam.siu.edu.in/forms/resultview.html';
-const SEAT_XPATH = 'xpath=//html/body/div[2]/form/div/div[1]/div[2]/div/div/div/div/div/input[1]';
-const VIEW_XPATH = 'xpath=//html/body/div[2]/form/div/div[1]/div[2]/div/div/div/div/div/input[2]';
-const LOGIN_INPUT_ID = '#login';
-const LOGIN_BTN_ID = '#lgnbtn';
-const RESULT_BTN_XPATH = 'xpath=//html/body/div[2]/form/div/div[2]/div[1]/a';
+const streamPipeline = promisify(pipeline);
 
-const prn = '22030121140'; // Replace with your PRN value
-const seatNo = '433035'; // Replace with your seat number
-const output = `${prn}.pdf`;
+const BASE_URL = 'https://siuexam.siu.edu.in/forms/resultview.html';
+const SELECTORS = {
+    loginInput: '#login',
+    loginBtn: '#lgnbtn',
+    seatInput: 'xpath=//html/body/div[2]/form/div/div[1]/div[2]/div/div/div/div/div/input[1]',
+    viewBtn: 'xpath=//html/body/div[2]/form/div/div[1]/div[2]/div/div/div/div/div/input[2]',
+    resultLink: 'xpath=//html/body/div[2]/form/div/div[2]/div[1]/a',
+};
+
+const PRN = '22030121307';
+const SEAT_NO = '500002';
+const OUTPUT_FILE = `${PRN}.pdf`;
 
 async function runScraper() {
-    console.log('Starting...');
-    const browser = await chromium.launch();
+    console.log('[*] Launching browser...');
+    const browser = await chromium.launch({ headless: false }); // Show browser
     const page = await browser.newPage();
+
     try {
-        await page.goto(BASE);
+        console.log('[*] Navigating to the results page...');
+        await page.goto(BASE_URL);
 
-        // Fill the login form and submit
-        console.log('Logging in...');
-        await page.fill(LOGIN_INPUT_ID, prn);
-        await page.click(LOGIN_BTN_ID);
-        console.log('Logged in');
-        await page.fill(SEAT_XPATH, seatNo);
-        await page.click(VIEW_XPATH);
-        console.log('Viewing result...');
+        console.log('[*] Logging in...');
+        await page.fill(SELECTORS.loginInput, PRN);
+        await page.click(SELECTORS.loginBtn);
 
-        // Wait for the result button and get the href attribute
-        const resultHref = await retry(async () => {
-            const element = await page.waitForSelector(RESULT_BTN_XPATH, { timeout: 50000 });
-            return await element.getAttribute('href');
+        console.log('[*] Entering seat number...');
+        
+        // Check if result is declared (div id='seatnum' has text)
+        const seatNumDiv = await page.waitForSelector('#seatnum', { timeout: 5000 });
+        const seatNumText = await seatNumDiv.textContent();
+        if (seatNumText.trim() === 'Result not available !!' || seatNumText.includes('Result not yet declared')) {
+            console.error('[✖] Result not available or not yet declared for this seat number.');
+            return;
+        }
+
+        await page.fill(SELECTORS.seatInput, SEAT_NO);
+        await page.click(SELECTORS.viewBtn);
+
+        console.log('[*] Waiting for result link...');
+        const resultElement = await retry(() => page.waitForSelector(SELECTORS.resultLink, { timeout: 5000 }));
+        const resultHref = await resultElement.getAttribute('href');
+        if (!resultHref) throw new Error('No href found for result link');
+
+        const resultUrl = new URL(resultHref, BASE_URL).href;
+        console.log(`[*] Result URL: ${resultUrl}`);
+
+        let response = await retry(async () => {
+            const res = await fetch(resultUrl);
+            if (res.status !== 200) throw new Error('Failed to fetch PDF');
+            return res;
         });
-        
-        console.log('Result found');
-        // Construct the target URL for the result PDF
-        const targetUrl = new URL(resultHref, BASE).href;
-        let response = null;
-        
-        console.log('Fetching PDF...');
-        // Fetch the result PDF
-        while (!response || response.status !== 200) {
-            console.log('Attempting to fetch PDF...');
-            response = await fetch(targetUrl);
-        }
 
-        console.log('PDF fetched');
-        // Write the PDF to the output file
-        try {
-            console.log('Saving PDF...');
-            const writableStream = fs.createWriteStream(output);
-            await streamPipeline(response.body, writableStream);
-        } catch (error) {
-            throw error;
-        }
-
-        console.log(`PDF saved as ${output}`);
-    } catch (error) {
-        throw error; // Re-throw the error to be caught by the outer retry logic
+        console.log('[*] Downloading PDF...');
+        const writeStream = fs.createWriteStream(OUTPUT_FILE);
+        await streamPipeline(response.body, writeStream);
+        console.log(`[✔] PDF saved as ${OUTPUT_FILE}`);
+    } catch (err) {
+        console.error(`[✖] Error: ${err.message}`);
+        throw err;
     } finally {
-        // Close the browser
         await browser.close();
-        console.log('Browser closed');
+        console.log('[*] Browser closed');
     }
 }
 
-const retry = async (action, attempts = 25, delay = 1000) => {
-    for (let i = 0; i < attempts; i++) {
+async function retry(action, attempts = 10, delay = 2000) {
+    for (let i = 1; i <= attempts; i++) {
         try {
             return await action();
         } catch (err) {
-            if (err.name === 'TimeoutError') {
-                console.log('Operation timed out. Retrying in 10 seconds...');
-                await new Promise(res => setTimeout(res, 10000));
-            } else {
-                if (i === attempts - 1) {
-                    throw err;
-                }
-                console.log(`Retrying... attempt ${i + 1}`);
-                await new Promise(res => setTimeout(res, delay));
-            }
+            const isLast = i === attempts;
+            console.warn(`[!] Attempt ${i} failed: ${err.message}${isLast ? '' : ' - Retrying...'}`);
+            if (isLast) throw err;
+            await new Promise(res => setTimeout(res, delay));
         }
     }
 }
 
-// Helper function to pipeline the response stream to the file system
-const { pipeline } = require('stream');
-const { promisify } = require('util');
-const streamPipeline = promisify(pipeline);
-
-// Main execution with retry logic
+// Run
 (async () => {
-    let attempts = 50; // Number of attempts the scraper will make
-    await retry(runScraper, attempts, 10000); // function, attempts, delay
+    try {
+        await runScraper();
+    } catch (err) {
+        console.error('[✖] Scraper failed after multiple attempts', err);
+    }
 })();
